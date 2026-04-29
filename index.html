@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080c10;
+  --surface: #0e1520;
+  --surface2: #162030;
+  --border: rgba(255,255,255,0.06);
+  --text: #e2e8f0;
+  --muted: #4a5568;
+  --green: #00d4aa;
+  --green-dim: rgba(0,212,170,0.1);
+  --red: #ff4d6d;
+  --red-dim: rgba(255,77,109,0.1);
+  --gold: #ffc857;
+  --gold-dim: rgba(255,200,87,0.1);
+  --blue: #4f9cf9;
+  --blue-dim: rgba(79,156,249,0.1);
+  --vwce: #00d4aa;
+  --vuaa: #4f9cf9;
+  --nvda: #76b900;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+/* NOISE TEXTURE */
+body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; opacity: 0.4; }
+
+/* HEADER */
+.header { padding: 20px 32px; display: flex; align-items: center; gap: 20px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(8,12,16,0.9); backdrop-filter: blur(12px); z-index: 100; }
+.logo { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 3px; color: var(--green); }
+.logo-sub { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.1em; margin-top: -2px; }
+.tabs { display: flex; gap: 2px; margin-left: 24px; }
+.tab { padding: 7px 16px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; background: none; border: none; font-family: 'IBM Plex Sans', sans-serif; letter-spacing: 0.03em; transition: all .15s; }
+.tab:hover { color: var(--text); background: var(--surface2); }
+.tab.active { color: var(--green); background: var(--green-dim); border: 1px solid rgba(0,212,170,0.2); }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{ opacity:1 } 50%{ opacity:0.3 } }
+.live-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+.last-update { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+
+/* LAYOUT */
+.page { display: none; padding: 28px 32px; max-width: 1400px; margin: 0 auto; position: relative; z-index: 1; }
+.page.active { display: block; }
+
+/* GRID */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 16px; }
+.g65 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+/* CARDS */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; position: relative; overflow: hidden; }
+.card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 60%); pointer-events: none; }
+.card-label { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; font-family: 'IBM Plex Mono', monospace; }
+.card-val { font-family: 'Bebas Neue', sans-serif; font-size: 36px; letter-spacing: 1px; line-height: 1; }
+.card-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; margin-top: 8px; font-family: 'IBM Plex Mono', monospace; }
+.badge-up { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,212,170,0.2); }
+.badge-down { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,77,109,0.2); }
+.badge-neutral { background: rgba(74,85,104,0.2); color: var(--muted); }
+
+/* TICKER ROW */
+.ticker-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 6px; position: relative; overflow: hidden; }
+.ticker-name { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; }
+.ticker-full { font-size: 11px; color: var(--muted); }
+.ticker-price { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500; }
+.ticker-meta { display: flex; gap: 12px; font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; flex-wrap: wrap; }
+.ticker-accent { position: absolute; top: 0; left: 0; width: 3px; height: 100%; border-radius: 12px 0 0 12px; }
+
+/* TABLE */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 9px 14px; border-bottom: 1px solid var(--border); text-align: left; font-family: 'IBM Plex Mono', monospace; }
+.tbl td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr:hover td { background: rgba(255,255,255,0.015); }
+
+/* LOADING */
+.loading { text-align: center; padding: 60px; color: var(--muted); }
+.sp { width: 28px; height: 28px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* PROJECTOR PAGE */
+.proj-input { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 13px; font-family: 'IBM Plex Mono', monospace; width: 100%; }
+.proj-input:focus { outline: none; border-color: var(--green); }
+.proj-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; display: block; font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; }
+.proj-group { margin-bottom: 14px; }
+.scenario-tag { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+.s-pessimist { background: var(--red-dim); color: var(--red); }
+.s-realistic { background: var(--green-dim); color: var(--green); }
+.s-optimist { background: var(--gold-dim); color: var(--gold); }
+
+/* MILESTONE */
+.milestone { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); margin-bottom: 8px; }
+.milestone-year { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: var(--green); min-width: 60px; }
+.milestone-val { font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 500; }
+.milestone-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+canvas { max-height: 300px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">PORTFOLIO</div>
+    <div class="logo-sub">TRADE 212 TRACKER</div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showPage('p1',this)">Visão Geral</button>
+    <button class="tab" onclick="showPage('p2',this)">Posições</button>
+    <button class="tab" onclick="showPage('p3',this)">Histórico</button>
+    <button class="tab" onclick="showPage('p4',this)">Projeção 20 Anos</button>
+  </div>
+  <div class="header-right">
+    <div class="live-dot"></div>
+    <span class="live-label">LIVE</span>
+    <span class="last-update" id="last-update">A carregar...</span>
+  <span class="last-update" id="refresh-countdown" style="color:var(--green);margin-left:8px"></span>
+  </div>
+</div>
+
+<!-- PAGE 1 — VISÃO GERAL -->
+<div class="page active" id="p1">
+  <div class="loading" id="loading1">
+    <div class="sp"></div>
+    <p>A buscar preços ao vivo...</p>
+    <p id="loading-status" style="font-size:11px;color:var(--muted);margin-top:8px;font-family:'IBM Plex Mono',monospace"></p>
+  </div>
+  <div id="p1-content" style="display:none">
+    <div class="g4" id="kpi-row"></div>
+    <div class="g3" id="ticker-row"></div>
+    <div class="g65">
+      <div class="card">
+        <div class="card-label">Composição do portfólio — valor actual</div>
+        <canvas id="chart-comp" style="max-height:260px"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-label">Performance por posição</div>
+        <div id="perf-list" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 2 — POSIÇÕES -->
+<div class="page" id="p2">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-label">Todas as posições</div>
+    <div style="overflow-x:auto;margin-top:12px"><table class="tbl" id="tabela-posicoes"></table></div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="card-label">Contribuições mensais</div>
+      <canvas id="chart-contrib" style="max-height:220px;margin-top:12px"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-label">Peso no portfólio (%)</div>
+      <canvas id="chart-peso" style="max-height:220px;margin-top:12px"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 3 — HISTÓRICO -->
+<div class="page" id="p3">
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <label style="font-size:11px;color:var(--muted);align-self:center;font-family:'IBM Plex Mono',monospace">PERÍODO:</label>
+    <button class="tab active" id="btn1m" onclick="setRange('1mo',this)">1M</button>
+    <button class="tab" id="btn3m" onclick="setRange('3mo',this)">3M</button>
+    <button class="tab" id="btn6m" onclick="setRange('6mo',this)">6M</button>
+    <button class="tab" id="btn1y" onclick="setRange('1y',this)">1A</button>
+    <button class="tab" id="btn5y" onclick="setRange('5y',this)">5A</button>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-label">Evolução do preço — todos os activos (indexado a 100)</div>
+    <canvas id="chart-hist" style="max-height:300px"></canvas>
+    <p style="font-size:11px;color:var(--muted);margin-top:8px">Indexado a 100 no início do período para comparação directa. Fonte: Yahoo Finance.</p>
+  </div>
+  <div class="g3" id="hist-individual"></div>
+</div>
+
+<!-- PAGE 4 — PROJEÇÃO 20 ANOS -->
+<div class="page" id="p4">
+  <div class="g2" style="align-items:start">
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-label">Parâmetros da simulação</div>
+        <div style="margin-top:14px">
+          <div class="proj-group">
+            <span class="proj-label">Valor actual do portfólio (€)</span>
+            <input class="proj-input" id="inp-atual" type="number" value="200" oninput="renderProjecao()">
+          </div>
+          <div class="proj-group">
+            <span class="proj-label">Contribuição mensal total (€)</span>
+            <input class="proj-input" id="inp-mensal" type="number" value="300" oninput="renderProjecao()">
+          </div>
+          <div class="proj-group">
+            <span class="proj-label">Horizonte temporal (anos)</span>
+            <input class="proj-input" id="inp-anos" type="number" value="20" min="1" max="50" oninput="renderProjecao()">
+          </div>
+          <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px">
+            <span class="proj-label">Taxas de retorno anuais</span>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <div style="flex:1">
+                <span style="font-size:10px;color:var(--red);display:block;margin-bottom:4px;font-family:'IBM Plex Mono',monospace">PESSIMISTA</span>
+                <input class="proj-input" id="inp-pess" type="number" value="4" step="0.5" oninput="renderProjecao()">
+              </div>
+              <div style="flex:1">
+                <span style="font-size:10px;color:var(--green);display:block;margin-bottom:4px;font-family:'IBM Plex Mono',monospace">REALISTA</span>
+                <input class="proj-input" id="inp-real" type="number" value="7" step="0.5" oninput="renderProjecao()">
+              </div>
+              <div style="flex:1">
+                <span style="font-size:10px;color:var(--gold);display:block;margin-bottom:4px;font-family:'IBM Plex Mono',monospace">OPTIMISTA</span>
+                <input class="proj-input" id="inp-otim" type="number" value="10" step="0.5" oninput="renderProjecao()">
+              </div>
+            </div>
+            <p style="font-size:11px;color:var(--muted);margin-top:8px">O VWCE e VUAA historicamente rendem ~7-9% ao ano nominal. Valores acima da inflação (~2-3% ao ano).</p>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">Marcos da projeção realista</div>
+        <div id="milestones" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-label">Crescimento do portfólio — 3 cenários</div>
+        <canvas id="chart-proj" style="max-height:320px"></canvas>
+      </div>
+      <div class="g3" id="proj-kpis" style="margin-bottom:0"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG — AS TUAS POSIÇÕES ─────────────────────────────────────────────
+const PORTFOLIO = [
+  {
+    id:         'VWCE',
+    nome:       'Vanguard FTSE All-World (Acc)',
+    ticker:     'VWCE.DE',          // Yahoo Finance ticker
+    unidades:   0.65053343,
+    investido:  100,                 // EUR investido
+    mensal:     100,                 // contribuição mensal EUR
+    cor:        '#00d4aa',
+    moeda:      'EUR',
+  },
+  {
+    id:         'VUAA',
+    nome:       'Vanguard S&P 500 (Acc)',
+    ticker:     'VUAA.DE',           // Amsterdam — cotado em EUR
+    unidades:   0.59533934,
+    investido:  70,
+    mensal:     150,
+    cor:        '#4f9cf9',
+    moeda:      'EUR',
+  },
+  {
+    id:         'NVDA',
+    nome:       'NVIDIA Corporation',
+    ticker:     'NVDA',
+    unidades:   0.16731921,
+    investido:  30,
+    mensal:     50,
+    cor:        '#76b900',
+    moeda:      'USD',
+  },
+];
+
+let PRICES    = {};   // { VWCE: 118.5, VUAA: 117.2, NVDA: 920.3 }
+let EUR_USD   = 1.08; // fallback
+let HIST_DATA = {};   // { VWCE: [{date,close},...], ... }
+let CHARTS    = {};
+let CUR_RANGE = '1mo';
+
+const fmt  = (v, d=2) => v != null ? v.toFixed(d) : '—';
+const fmtE = (v) => v != null ? v.toLocaleString('pt-PT', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €' : '—';
+
+// ── FETCH PRICES ──────────────────────────────────────────────────────────
+async function fetchPrice(ticker) {
+  // Try multiple proxies in sequence
+  const proxies = [
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://corsproxy.io/?${url}`,
+    url => `https://api.codetabs.com/v1/proxy?quest=${url}`,
+  ];
+  const yahooUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d`;
+  
+  for (const makeProxy of proxies) {
+    try {
+      const res = await fetch(makeProxy(yahooUrl), { headers: { Accept: 'application/json' } });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const result = json?.chart?.result?.[0];
+      const meta = result?.meta;
+      if (!meta?.regularMarketPrice) continue;
+      return {
+        price:    meta.regularMarketPrice,
+        prev:     meta.chartPreviousClose ?? null,
+        currency: meta.currency ?? 'EUR',
+        name:     meta.longName ?? ticker,
+      };
+    } catch(e) {
+      continue;
+    }
+  }
+  console.warn('All proxies failed for', ticker);
+  return null;
+}
+
+async function fetchHistory(ticker, range) {
+  const proxies = [
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://corsproxy.io/?${url}`,
+    url => `https://api.codetabs.com/v1/proxy?quest=${url}`,
+  ];
+  const yahooUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1wk&range=${range}`;
+  
+  for (const makeProxy of proxies) {
+    try {
+      const res = await fetch(makeProxy(yahooUrl));
+      if (!res.ok) continue;
+      const json = await res.json();
+      const result = json?.chart?.result?.[0];
+      const timestamps = result?.timestamp ?? [];
+      const closes = result?.indicators?.quote?.[0]?.close ?? [];
+      if (!timestamps.length) continue;
+      return timestamps.map((ts, i) => ({
+        date:  new Date(ts * 1000).toISOString().slice(0,10),
+        close: closes[i] ? parseFloat(closes[i].toFixed(4)) : null
+      })).filter(d => d.close != null);
+    } catch(e) {
+      continue;
+    }
+  }
+  return [];
+}
+
+async function loadAll() {
+  // Fetch EUR/USD rate
+  const fxData = await fetchPrice('EURUSD=X');
+  if (fxData?.price) EUR_USD = fxData.price;
+
+  // Fetch all prices in parallel
+  const statusEl = document.getElementById('loading-status');
+  if (statusEl) statusEl.textContent = 'A tentar proxies... (pode demorar 5-10s)';
+  const results = await Promise.all(PORTFOLIO.map(a => fetchPrice(a.ticker)));
+  results.forEach((r, i) => {
+    if (r?.price) {
+      let price = r.price;
+      // Convert USD to EUR if needed
+      if (PORTFOLIO[i].moeda === 'USD') price = price / EUR_USD;
+      PRICES[PORTFOLIO[i].id] = { price, prev: r.prev ? r.prev / (PORTFOLIO[i].moeda === 'USD' ? EUR_USD : 1) : null };
+    }
+  });
+
+  const now = new Date().toLocaleTimeString('pt-PT', {hour:'2-digit',minute:'2-digit'});
+  const gotPrices = Object.keys(PRICES).length;
+  
+  if (!gotPrices) {
+    // All APIs failed — show manual entry fallback
+    document.getElementById('loading1').innerHTML = `
+      <p style="color:var(--red);margin-bottom:16px">Não foi possível obter preços automaticamente (APIs bloqueadas).</p>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:20px">Introduz os preços manualmente para ver o dashboard:</p>
+      ${PORTFOLIO.map(a => `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;justify-content:center">
+          <label style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:${a.cor};min-width:60px">${a.id}</label>
+          <input id="manual-${a.id}" type="number" step="0.01" placeholder="Preço em €"
+            style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:13px;width:140px">
+        </div>`).join('')}
+      <button onclick="applyManualPrices()" style="margin-top:16px;background:var(--green-dim);border:1px solid rgba(0,212,170,0.3);color:var(--green);padding:10px 24px;border-radius:8px;font-size:13px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif">
+        Aplicar preços
+      </button>`;
+    return;
+  }
+
+  document.getElementById('last-update').textContent = 'Actualizado às ' + now + ' (' + gotPrices + '/' + PORTFOLIO.length + ' activos)';
+  document.getElementById('loading1').style.display = 'none';
+  document.getElementById('p1-content').style.display = 'block';
+
+  renderVisaoGeral();
+  renderPosicoes();
+  renderProjecao();
+
+  // Load history for default range
+  await loadHistory(CUR_RANGE);
+}
+
+async function loadHistory(range) {
+  const results = await Promise.all(
+    PORTFOLIO.map(a => fetchHistory(a.ticker, range))
+  );
+  PORTFOLIO.forEach((a, i) => { HIST_DATA[a.id] = results[i]; });
+  renderHistorico();
+}
+
+function setRange(range, btn) {
+  CUR_RANGE = range;
+  document.querySelectorAll('#p3 .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  loadHistory(range);
+}
+
+// ── PAGE 1 — VISÃO GERAL ──────────────────────────────────────────────────
+function renderVisaoGeral() {
+  let totalInvestido = 0, totalActual = 0;
+  PORTFOLIO.forEach(a => {
+    totalInvestido += a.investido;
+    const p = PRICES[a.id]?.price;
+    if (p) totalActual += p * a.unidades;
+  });
+  const ganho = totalActual - totalInvestido;
+  const ganhoPct = (ganho / totalInvestido) * 100;
+  const mensalTotal = PORTFOLIO.reduce((s, a) => s + a.mensal, 0);
+
+  const upCls = ganho >= 0 ? 'var(--green)' : 'var(--red)';
+  const sym   = ganho >= 0 ? '+' : '';
+
+  document.getElementById('kpi-row').innerHTML = `
+    <div class="card">
+      <div class="card-label">Valor actual</div>
+      <div class="card-val" style="color:var(--green)">${fmtE(totalActual)}</div>
+      <div class="badge ${ganho>=0?'badge-up':'badge-down'}">${sym}${fmtE(ganho)} (${sym}${fmt(ganhoPct,1)}%)</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total investido</div>
+      <div class="card-val">${fmtE(totalInvestido)}</div>
+      <div class="card-sub">em ${PORTFOLIO.length} posições</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ganho/Perda</div>
+      <div class="card-val" style="color:${upCls}">${sym}${fmtE(ganho)}</div>
+      <div class="badge ${ganho>=0?'badge-up':'badge-down'}">${sym}${fmt(ganhoPct,2)}% retorno</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Contribuição mensal</div>
+      <div class="card-val" style="color:var(--gold)">${fmtE(mensalTotal)}</div>
+      <div class="card-sub">${PORTFOLIO.map(a => a.id + ' ' + a.mensal + '€').join(' · ')}</div>
+    </div>`;
+
+  // Ticker cards
+  document.getElementById('ticker-row').innerHTML = PORTFOLIO.map(a => {
+    const d = PRICES[a.id];
+    const p = d?.price;
+    const pr = d?.prev;
+    const gain = p && a.investido ? (p * a.unidades - a.investido) : null;
+    const gainPct = gain != null ? (gain / a.investido) * 100 : null;
+    const dayChg = (p && pr) ? ((p - pr) / pr * 100) : null;
+    return `<div class="ticker-card">
+      <div class="ticker-accent" style="background:${a.cor}"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="ticker-name" style="color:${a.cor}">${a.id}</div>
+          <div class="ticker-full">${a.nome}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="ticker-price">${p ? fmt(p,2) + ' €' : '—'}</div>
+          ${dayChg != null ? `<div style="font-size:11px;color:${dayChg>=0?'var(--green)':'var(--red)'};font-family:'IBM Plex Mono',monospace">${dayChg>=0?'+':''}${fmt(dayChg,2)}% hoje</div>` : ''}
+        </div>
+      </div>
+      <div class="ticker-meta">
+        <span>${a.unidades.toFixed(6)} un.</span>
+        <span>Custo: ${fmtE(a.investido)}</span>
+        <span>Valor: ${p ? fmtE(p * a.unidades) : '—'}</span>
+        ${gain != null ? `<span style="color:${gain>=0?'var(--green)':'var(--red)'}">${gain>=0?'+':''}${fmtE(gain)} (${gainPct>=0?'+':''}${fmt(gainPct,1)}%)</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Donut
+  const labels = PORTFOLIO.map(a => a.id);
+  const vals   = PORTFOLIO.map(a => {
+    const p = PRICES[a.id]?.price;
+    return p ? parseFloat((p * a.unidades).toFixed(2)) : 0;
+  });
+  destroyChart('chart-comp');
+  CHARTS['chart-comp'] = new Chart(document.getElementById('chart-comp'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: vals, backgroundColor: PORTFOLIO.map(a => a.cor + 'cc'), borderWidth: 0, hoverOffset: 6 }] },
+    options: {
+      cutout: '62%', responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#4a5568', font: { size: 12, family: 'IBM Plex Mono' }, padding: 16 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmtE(ctx.parsed)} (${fmt(ctx.parsed/vals.reduce((a,b)=>a+b,0)*100,1)}%)` } }
+      }
+    }
+  });
+
+  // Performance bars
+  const perfList = document.getElementById('perf-list');
+  perfList.innerHTML = PORTFOLIO.map(a => {
+    const p = PRICES[a.id]?.price;
+    const val = p ? p * a.unidades : 0;
+    const gain = val - a.investido;
+    const pct = (gain / a.investido) * 100;
+    return `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:12px;font-weight:500;color:${a.cor}">${a.id}</span>
+        <span style="font-size:11px;color:${gain>=0?'var(--green)':'var(--red)'};font-family:'IBM Plex Mono',monospace">${gain>=0?'+':''}${fmt(pct,1)}%</span>
+      </div>
+      <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+        <div style="height:6px;border-radius:4px;background:${a.cor};width:${Math.min(Math.abs(pct)*2,100)}%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;font-family:'IBM Plex Mono',monospace">
+        <span>Investido: ${fmtE(a.investido)}</span>
+        <span>Actual: ${fmtE(val)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── PAGE 2 — POSIÇÕES ─────────────────────────────────────────────────────
+function renderPosicoes() {
+  let html = `<thead><tr>
+    <th>Activo</th><th>Ticker</th><th>Unidades</th><th>Preço</th>
+    <th>Custo médio</th><th>Valor actual</th><th>Ganho/Perda</th><th>Return</th><th>Peso</th>
+  </tr></thead><tbody>`;
+
+  const totalVal = PORTFOLIO.reduce((s, a) => {
+    const p = PRICES[a.id]?.price;
+    return s + (p ? p * a.unidades : 0);
+  }, 0);
+
+  PORTFOLIO.forEach(a => {
+    const p = PRICES[a.id]?.price;
+    const val = p ? p * a.unidades : 0;
+    const gain = val - a.investido;
+    const pct = (gain / a.investido) * 100;
+    const custoMedio = a.investido / a.unidades;
+    const peso = totalVal ? (val / totalVal * 100) : 0;
+    html += `<tr>
+      <td><span style="color:${a.cor};font-weight:600;font-family:'IBM Plex Mono',monospace">${a.id}</span><br><span style="font-size:11px;color:var(--muted)">${a.nome}</span></td>
+      <td style="font-family:'IBM Plex Mono',monospace;color:var(--muted)">${a.ticker}</td>
+      <td style="font-family:'IBM Plex Mono',monospace">${a.unidades.toFixed(6)}</td>
+      <td style="font-family:'IBM Plex Mono',monospace">${p ? fmt(p,2) + ' €' : '—'}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;color:var(--muted)">${fmt(custoMedio,2)} €</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-weight:600">${fmtE(val)}</td>
+      <td style="color:${gain>=0?'var(--green)':'var(--red)'};font-family:'IBM Plex Mono',monospace">${gain>=0?'+':''}${fmtE(gain)}</td>
+      <td><span class="badge ${gain>=0?'badge-up':'badge-down'}">${gain>=0?'+':''}${fmt(pct,1)}%</span></td>
+      <td style="font-family:'IBM Plex Mono',monospace">${fmt(peso,1)}%</td>
+    </tr>`;
+  });
+  document.getElementById('tabela-posicoes').innerHTML = html + '</tbody>';
+
+  // Contrib chart
+  destroyChart('chart-contrib');
+  CHARTS['chart-contrib'] = new Chart(document.getElementById('chart-contrib'), {
+    type: 'bar',
+    data: {
+      labels: PORTFOLIO.map(a => a.id),
+      datasets: [{ label: '€/mês', data: PORTFOLIO.map(a => a.mensal), backgroundColor: PORTFOLIO.map(a => a.cor + 'bb'), borderRadius: 6, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#4a5568', font: { family: 'IBM Plex Mono', size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4a5568', callback: v => v + ' €' } }
+      }
+    }
+  });
+
+  // Weight donut
+  const totalVal2 = PORTFOLIO.reduce((s,a) => { const p = PRICES[a.id]?.price; return s + (p ? p*a.unidades : 0); }, 0);
+  destroyChart('chart-peso');
+  CHARTS['chart-peso'] = new Chart(document.getElementById('chart-peso'), {
+    type: 'doughnut',
+    data: {
+      labels: PORTFOLIO.map(a => a.id + ' ' + (totalVal2 ? fmt(PRICES[a.id]?.price ? PRICES[a.id].price*a.unidades/totalVal2*100 : 0, 1) : '0') + '%'),
+      datasets: [{ data: PORTFOLIO.map(a => { const p=PRICES[a.id]?.price; return p?parseFloat((p*a.unidades).toFixed(2)):0; }), backgroundColor: PORTFOLIO.map(a => a.cor+'cc'), borderWidth: 0 }]
+    },
+    options: { cutout: '60%', responsive: true, plugins: { legend: { position:'bottom', labels: { color:'#4a5568', font:{size:11,family:'IBM Plex Mono'} } } } }
+  });
+}
+
+// ── PAGE 3 — HISTÓRICO ────────────────────────────────────────────────────
+function renderHistorico() {
+  if (!Object.keys(HIST_DATA).length) return;
+
+  // Indexed chart (all assets base 100)
+  const allDates = [...new Set(
+    Object.values(HIST_DATA).flatMap(arr => arr.map(d => d.date))
+  )].sort();
+
+  const datasets = PORTFOLIO.map(a => {
+    const data = HIST_DATA[a.id] || [];
+    const first = data[0]?.close;
+    const indexed = allDates.map(dt => {
+      const point = data.find(d => d.date === dt);
+      return point && first ? parseFloat((point.close / first * 100).toFixed(2)) : null;
+    });
+    return { label: a.id, data: indexed, borderColor: a.cor, backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, borderWidth: 2, spanGaps: true };
+  });
+
+  destroyChart('chart-hist');
+  CHARTS['chart-hist'] = new Chart(document.getElementById('chart-hist'), {
+    type: 'line',
+    data: { labels: allDates.map(d => d.slice(5)), datasets },
+    options: {
+      responsive: true, interaction: { mode: 'index' },
+      plugins: { legend: { labels: { color: '#4a5568', font: { size: 12, family: 'IBM Plex Mono' } } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4a5568', maxTicksLimit: 12 } },
+        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4a5568', callback: v => v.toFixed(0) } }
+      }
+    }
+  });
+
+  // Individual mini charts
+  const container = document.getElementById('hist-individual');
+  container.innerHTML = PORTFOLIO.map(a => `
+    <div class="card">
+      <div class="card-label" style="color:${a.cor}">${a.id} — ${a.nome}</div>
+      <canvas id="chart-mini-${a.id}" style="max-height:140px;margin-top:8px"></canvas>
+    </div>`).join('');
+
+  PORTFOLIO.forEach(a => {
+    const data = HIST_DATA[a.id] || [];
+    const first = data[0]?.close, last = data[data.length-1]?.close;
+    const chg = (first && last) ? ((last-first)/first*100) : null;
+    destroyChart('chart-mini-' + a.id);
+    CHARTS['chart-mini-' + a.id] = new Chart(document.getElementById('chart-mini-' + a.id), {
+      type: 'line',
+      data: {
+        labels: data.map(d => d.date.slice(5)),
+        datasets: [{ data: data.map(d => d.close), borderColor: chg >= 0 ? a.cor : 'var(--red)', backgroundColor: (chg >= 0 ? a.cor : '#ff4d6d') + '15', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 1.5 }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.parsed.y, 2) + ' €' } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#4a5568', maxTicksLimit: 6, font: { size: 10 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4a5568', font: { size: 10 }, callback: v => v.toFixed(0) + '€' } }
+        }
+      }
+    });
+  });
+}
+
+// ── PAGE 4 — PROJEÇÃO ─────────────────────────────────────────────────────
+function renderProjecao() {
+  const atual  = parseFloat(document.getElementById('inp-atual').value) || 200;
+  const mensal = parseFloat(document.getElementById('inp-mensal').value) || 300;
+  const anos   = parseInt(document.getElementById('inp-anos').value) || 20;
+  const rPess  = parseFloat(document.getElementById('inp-pess').value) / 100 || 0.04;
+  const rReal  = parseFloat(document.getElementById('inp-real').value) / 100 || 0.07;
+  const rOtim  = parseFloat(document.getElementById('inp-otim').value) / 100 || 0.10;
+
+  function simular(taxaAnual) {
+    const taxaMensal = Math.pow(1 + taxaAnual, 1/12) - 1;
+    const pontos = [atual];
+    let val = atual;
+    for (let m = 1; m <= anos * 12; m++) {
+      val = val * (1 + taxaMensal) + mensal;
+      if (m % 12 === 0) pontos.push(parseFloat(val.toFixed(2)));
+    }
+    return pontos;
+  }
+
+  function totalInvestido(a) {
+    const pontos = [a];
+    for (let y = 1; y <= anos; y++) pontos.push(a + mensal * 12 * y);
+    return pontos;
+  }
+
+  const labels   = Array.from({length: anos + 1}, (_, i) => i === 0 ? 'Hoje' : 'Ano ' + i);
+  const pessData = simular(rPess);
+  const realData = simular(rReal);
+  const otimData = simular(rOtim);
+  const invData  = totalInvestido(atual);
+
+  destroyChart('chart-proj');
+  CHARTS['chart-proj'] = new Chart(document.getElementById('chart-proj'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Pessimista (' + (rPess*100).toFixed(0) + '%/ano)', data: pessData, borderColor: 'var(--red)', backgroundColor: 'rgba(255,77,109,0.04)', fill: false, tension: 0.4, pointRadius: 0, borderWidth: 1.5, borderDash: [4,3] },
+        { label: 'Realista ('  + (rReal*100).toFixed(0) + '%/ano)', data: realData, borderColor: 'var(--green)', backgroundColor: 'rgba(0,212,170,0.06)', fill: true, tension: 0.4, pointRadius: 2, borderWidth: 2.5 },
+        { label: 'Optimista ('  + (rOtim*100).toFixed(0) + '%/ano)', data: otimData, borderColor: 'var(--gold)', backgroundColor: 'rgba(255,200,87,0.04)', fill: false, tension: 0.4, pointRadius: 0, borderWidth: 1.5, borderDash: [6,2] },
+        { label: 'Total investido', data: invData, borderColor: '#4a5568', backgroundColor: 'transparent', fill: false, tension: 0, pointRadius: 0, borderWidth: 1, borderDash: [2,4] },
+      ]
+    },
+    options: {
+      responsive: true, interaction: { mode: 'index' },
+      plugins: { legend: { labels: { color: '#4a5568', font: { size: 11, family: 'IBM Plex Mono' } } }, tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + fmtE(ctx.parsed.y) } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4a5568', maxTicksLimit: 10 } },
+        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#4a5568', callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k €' : v + ' €' } }
+      }
+    }
+  });
+
+  // KPI final values
+  const finalPess = pessData[pessData.length-1];
+  const finalReal = realData[realData.length-1];
+  const finalOtim = otimData[otimData.length-1];
+  const finalInv  = invData[invData.length-1];
+
+  document.getElementById('proj-kpis').innerHTML = `
+    <div class="card">
+      <div class="card-label" style="color:var(--red)">Pessimista ao fim de ${anos}A</div>
+      <div class="card-val" style="color:var(--red);font-size:26px">${fmtE(finalPess)}</div>
+      <div class="badge badge-down">×${fmt(finalPess/finalInv,1)} do investido</div>
+    </div>
+    <div class="card">
+      <div class="card-label" style="color:var(--green)">Realista ao fim de ${anos}A</div>
+      <div class="card-val" style="color:var(--green);font-size:26px">${fmtE(finalReal)}</div>
+      <div class="badge badge-up">×${fmt(finalReal/finalInv,1)} do investido</div>
+    </div>
+    <div class="card">
+      <div class="card-label" style="color:var(--gold)">Optimista ao fim de ${anos}A</div>
+      <div class="card-val" style="color:var(--gold);font-size:26px">${fmtE(finalOtim)}</div>
+      <div class="badge" style="background:var(--gold-dim);color:var(--gold)">×${fmt(finalOtim/finalInv,1)} do investido</div>
+    </div>`;
+
+  // Milestones (realistic scenario)
+  const milestones = [1, 2, 5, 10, 15, 20].filter(y => y <= anos);
+  document.getElementById('milestones').innerHTML = milestones.map(y => {
+    const val = realData[y];
+    const inv = invData[y];
+    const ganho = val - inv;
+    return `<div class="milestone">
+      <div class="milestone-year">${y}A</div>
+      <div>
+        <div class="milestone-val">${fmtE(val)}</div>
+        <div class="milestone-sub">Investido: ${fmtE(inv)} · Ganho: <span style="color:var(--green)">+${fmtE(ganho)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+function destroyChart(id) { if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; } }
+
+// ── MANUAL PRICE ENTRY FALLBACK ─────────────────────────────────────────
+function applyManualPrices() {
+  PORTFOLIO.forEach(a => {
+    const input = document.getElementById('manual-' + a.id);
+    if (input?.value) {
+      PRICES[a.id] = { price: parseFloat(input.value), prev: null };
+    }
+  });
+  if (!Object.keys(PRICES).length) return;
+  document.getElementById('last-update').textContent = 'Preços manuais';
+  document.getElementById('loading1').style.display = 'none';
+  document.getElementById('p1-content').style.display = 'block';
+  renderVisaoGeral();
+  renderPosicoes();
+  renderProjecao();
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────
+
+// Detect file:// origin — proxies don't work from it
+if (location.protocol === 'file:') {
+  document.getElementById('loading1').innerHTML = `
+    <div style="max-width:480px;margin:0 auto;text-align:left">
+      <p style="color:var(--red);font-size:15px;margin-bottom:16px">⚠️ Abre o ficheiro via servidor local</p>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:20px">
+        As APIs financeiras bloqueiam pedidos de ficheiros locais (<code style="color:var(--green)">file://</code>).
+        Para os preços funcionarem, corre estes comandos no terminal:
+      </p>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:'IBM Plex Mono',monospace;font-size:12px;margin-bottom:16px">
+        <div style="color:var(--muted);margin-bottom:6px"># 1. Abre o terminal (CMD ou PowerShell) na pasta onde está o ficheiro</div>
+        <div style="color:var(--green);margin-bottom:12px">cd C:\Users\PC\Downloads</div>
+        <div style="color:var(--muted);margin-bottom:6px"># 2. Inicia o servidor local</div>
+        <div style="color:var(--green);margin-bottom:12px">python -m http.server 8080</div>
+        <div style="color:var(--muted);margin-bottom:6px"># 3. Abre no browser</div>
+        <div style="color:var(--gold)">http://localhost:8080/portfolio_dashboard.html</div>
+      </div>
+      <p style="color:var(--muted);font-size:12px">Ou insere os preços manualmente:</p>
+      <div style="margin-top:14px">
+        ${PORTFOLIO.map(a => `
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+            <label style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:${a.cor};min-width:60px">${a.id}</label>
+            <input id="manual-${a.id}" type="number" step="0.01" placeholder="Preço em €"
+              style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:13px;width:140px">
+          </div>`).join('')}
+        <button onclick="applyManualPrices()"
+          style="margin-top:8px;background:var(--green-dim);border:1px solid rgba(0,212,170,0.3);color:var(--green);padding:10px 24px;border-radius:8px;font-size:13px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif">
+          Usar preços manuais
+        </button>
+      </div>
+    </div>`;
+} else {
+  loadAll().catch(e => {
+    document.getElementById('loading1').innerHTML = `<p style="color:var(--red)">Erro: ${e.message}</p>`;
+  });
+
+  // Auto-refresh every 15 minutes
+  const REFRESH_INTERVAL = 15 * 60; // seconds
+  let secondsLeft = REFRESH_INTERVAL;
+  const countdownEl = document.getElementById('refresh-countdown');
+
+  function updateCountdown() {
+    const m = Math.floor(secondsLeft / 60);
+    const s = secondsLeft % 60;
+    if (countdownEl) countdownEl.textContent = `↻ ${m}:${s.toString().padStart(2,'0')}`;
+    secondsLeft--;
+    if (secondsLeft < 0) {
+      secondsLeft = REFRESH_INTERVAL;
+      if (countdownEl) countdownEl.textContent = '↻ A actualizar...';
+      // Refresh prices without resetting the whole page
+      loadAll().catch(() => {});
+    }
+  }
+
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+}
+</script>
+</body>
+</html>
